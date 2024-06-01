@@ -2,16 +2,25 @@ package service
 
 import (
 	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/emeraldls/fyp/internal/types"
+	"github.com/joho/godotenv"
 )
 
-var rs = RouteService{
-	apiKey: "IWkHU9joQd9Fle_Tz5-izygLSrLvycV638LY-28ic_0",
-}
-
 func TestRoutingService(t *testing.T) {
+	err := godotenv.Load("../../.env")
+	if err != nil {
+		panic(err)
+	}
+
+	var apiKey = os.Getenv("HERE_API_KEY")
+
+	var rs = RouteService{
+		apiKey: apiKey,
+	}
+
 	t.Run("get_route", func(t *testing.T) {
 		res, err := rs.GetRoute(types.BICYCLE, []float64{53.32556, 14.65314}, []float64{53.65422, 14.66636})
 		if err != nil {
