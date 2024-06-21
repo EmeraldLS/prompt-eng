@@ -3,14 +3,16 @@ package rest
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 
-	"github.com/emeraldls/fyp/internal/llm_sync"
+	"github.com/emeraldls/fyp/internal/service"
 	"github.com/emeraldls/fyp/internal/types"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -19,7 +21,9 @@ import (
 )
 
 type Config struct {
-	ListAddr string
+	ListAddr           string
+	EntityExtractorURL string
+	ClientOrigin       string
 }
 
 type Server struct {
@@ -71,7 +75,7 @@ func (s *Server) SetupRouter() {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:  []string{"http://localhost:5173"},
+		AllowOrigins:  []string{s.ClientOrigin},
 		AllowMethods:  []string{"GET", "POST"},
 		AllowHeaders:  []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders: []string{"Content-Type"},
@@ -81,6 +85,30 @@ func (s *Server) SetupRouter() {
 	r.GET("/messages", s.MessagesHandler)
 
 	r.Run(s.ListAddr)
+}
+
+func extractEntities(req types.ChatMessage, url string) (*types.Entity, error) {
+	requestBody, _ := json.Marshal(req)
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+
+		return nil, errors.New(string(body))
+	}
+
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	var entities types.Entity
+	json.Unmarshal(body, &entities)
+
+	return &entities, nil
 }
 
 // TODO: use jwt for token
@@ -108,7 +136,7 @@ func (s *Server) SendMessage(c *gin.Context) {
 	}
 
 	s.mut.RLock()
-	msgChan, ok := s.subscribedClients[sessionID]
+	_, ok := s.subscribedClients[sessionID]
 	s.mut.RUnlock()
 
 	if !ok {
@@ -130,13 +158,55 @@ func (s *Server) SendMessage(c *gin.Context) {
 		return
 	}
 
-	go func() {
-		llm_sync.UseGoogle(req.Prompt, msgChan)
-	}()
+	entities, err := extractEntities(req, s.EntityExtractorURL)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"STATUS":  "FAILURE",
+			"MESSAGE": "Unable to extract entities: " + err.Error(),
+		})
+		return
+	}
+
+	rs := service.NewRouteService(os.Getenv("HERE_API_KEY"))
+	fromResp, err := rs.EncodeText(entities.From)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"STATUS":  "FAILURE",
+			"MESSAGE": err.Error(),
+		})
+		return
+	}
+
+	toResp, err := rs.EncodeText(entities.To)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"STATUS":  "FAILURE",
+			"MESSAGE": err.Error(),
+		})
+		return
+	}
+
+	fromCoordinates := fromResp.Items[0].Position
+	toCoordinates := toResp.Items[0].Position
+
+	route, err := rs.GetRoute(types.CAR, []float64{fromCoordinates.Lat, fromCoordinates.Lng}, []float64{toCoordinates.Lat, toCoordinates.Lng})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"STATUS":  "FAILURE",
+			"MESSAGE": err.Error(),
+		})
+		return
+	}
+
+	// go func() {
+	// 	llm_sync.UseGoogle(req.Prompt, msgChan)
+	// }()
 
 	c.JSON(http.StatusOK, gin.H{
-		"STATUS": "SUCCESS",
+		"STATUS":  "SUCCESS",
+		"MESSAGE": route,
 	})
+
 }
 
 func (s *Server) MessagesHandler(c *gin.Context) {

@@ -1,5 +1,11 @@
 package types
 
+type Entity struct {
+	Locations []string `json:"locations"`
+	From      string   `json:"from"`
+	To        string   `json:"to"`
+}
+
 type Routes struct {
 	Routes  []Route  `json:"routes"`
 	Notices []Notice `json:"notices,omitempty"`

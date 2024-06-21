@@ -14,6 +14,12 @@ type RouteService struct {
 	apiKey string
 }
 
+func NewRouteService(apiKey string) *RouteService {
+	return &RouteService{
+		apiKey,
+	}
+}
+
 func meshOrigin(origin []float64) string {
 	url := "&origin="
 	for i := 0; i < len(origin); i++ {

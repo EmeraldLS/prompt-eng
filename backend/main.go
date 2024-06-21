@@ -7,7 +7,9 @@ import (
 
 func main() {
 	srv := rest.NewServer(rest.Config{
-		ListAddr: ":2323",
+		ListAddr:           ":2323",
+		EntityExtractorURL: "http://localhost:2525/extract-entities",
+		ClientOrigin:       "http://localhost:5173",
 	})
 
 	srv.SetupRouter()

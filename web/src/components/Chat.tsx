@@ -23,8 +23,14 @@ export const Chat = ({ sidebar }: { sidebar: boolean }) => {
     };
 
     eventSource.addEventListener("message", (event) => {
-      const parsedData = JSON.parse(event.data);
-      console.log(parsedData);
+      const resp = JSON.parse(event.data);
+      const botMessage: Message = {
+        id: ++messageIdRef.current,
+        message: resp.data,
+        isUser: false,
+      };
+
+      setMessages((prevMsgs) => [...prevMsgs, botMessage]);
     });
 
     eventSource.addEventListener("connected", function (event) {
@@ -58,7 +64,7 @@ export const Chat = ({ sidebar }: { sidebar: boolean }) => {
       setMessages((prevMsgs) => [...prevMsgs, newMessage]);
       setInput("");
 
-      const resp = await fetch("http://127.0.0.1:2323/chat", {
+      const resp = await fetch("http://localhost:2323/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -68,8 +74,8 @@ export const Chat = ({ sidebar }: { sidebar: boolean }) => {
           prompt: input,
         }),
       });
-
-      console.log("Response: ", resp);
+      const data = await resp.json();
+      console.log(data);
     } catch (err) {
       console.log(err);
     } finally {
@@ -111,13 +117,13 @@ export const Chat = ({ sidebar }: { sidebar: boolean }) => {
           >
             Check
           </button> */}
-          <input
-            type="text"
-            className="p-2 border border-gray-300 rounded-lg w-full pr-[3.6rem] outline-accent text-sm sm:text-base text-mutualText"
+          <textarea
+            className="p-2 border border-gray-300 rounded-lg w-full pr-[3.6rem] outline-accent text-sm sm:text-base text-mutualText resize-none min-h-[40px] max-h-[200px] overflow-y-auto flex items-center"
+            cols={30}
             placeholder="Enter your location"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-          />
+          ></textarea>
           <button
             type="submit"
             className={` ${
