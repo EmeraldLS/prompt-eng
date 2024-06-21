@@ -3,7 +3,7 @@ package respository
 import "database/sql"
 
 type respository struct {
-	DB *sql.DB
+	db *sql.DB
 }
 
 func NewRepository() (*respository, error) {
@@ -14,6 +14,6 @@ func NewRepository() (*respository, error) {
 	}
 
 	return &respository{
-		DB: conn,
+		db: conn,
 	}, nil
 }

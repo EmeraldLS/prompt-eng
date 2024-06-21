@@ -1,9 +1,16 @@
 package main
 
-import "github.com/joho/godotenv"
+import (
+	"github.com/emeraldls/fyp/internal/rest"
+	"github.com/joho/godotenv"
+)
 
 func main() {
+	srv := rest.NewServer(rest.Config{
+		ListAddr: ":2323",
+	})
 
+	srv.SetupRouter()
 }
 
 func init() {
